@@ -1,38 +1,29 @@
---// JobID-Joiner-Roblox by awaitlol. on Discord!
---// Versión sin UI/Menu, solo teleporta automáticamente al JobId indicado por el usuario.
---// El usuario debe definir getgenv().GameID y getgenv().JobID antes de ejecutar este script.
---// Ejemplo en el executor:
---// getgenv().GameID = 123456789
---// getgenv().JobID = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
---// loadstring(game:HttpGet("https://raw.githubusercontent.com/awaitlol/JobID-Joiner-Roblox/refs/heads/main/JobIDJoiner.lua",true))()
+--// Autojoiner JobID - Versión automática SIN UI, solo teleport a JobID
 
---// Services
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
-
 local LP = Players.LocalPlayer
 
---// Validar que GameID y JobID están definidos
-if not getgenv().GameID or not tonumber(getgenv().GameID) then
-    warn("[JobId Joiner] No GameID válido proporcionado en getgenv().GameID. Deteniendo script.")
-    return
-end
-
+-- Validar JobID
 if not getgenv().JobID or type(getgenv().JobID) ~= "string" or #getgenv().JobID == 0 then
-    warn("[JobId Joiner] No JobID válido proporcionado en getgenv().JobID. Deteniendo script.")
+    warn("[Autojoiner] No se proporcionó un JobID válido en getgenv().JobID. Deteniendo script.")
     return
 end
 
---// Si ya está en el juego correcto pero en diferente JobId, teleporta
-if game.PlaceId ~= tonumber(getgenv().GameID) then
-    warn("[JobId Joiner] Estás en otro juego. El script intentará teletransportar al GameID y JobID especificados.")
+-- Tomar GameID de la experiencia actual
+local GameID = game.PlaceId
+
+-- Si ya estás en ese JobId, no hacer nada
+if tostring(game.JobId) == tostring(getgenv().JobID) then
+    warn("[Autojoiner] Ya estás en el JobID especificado ("..getgenv().JobID..").")
+    return
 end
 
---// Intentar teletransportar al JobId dado
+-- Teleportar al JobID
 local success, err = pcall(function()
-    TeleportService:TeleportToPlaceInstance(tonumber(getgenv().GameID), getgenv().JobID, LP)
+    TeleportService:TeleportToPlaceInstance(GameID, getgenv().JobID, LP)
 end)
 
 if not success then
-    warn("[JobId Joiner] Fallo al teletransportar: " .. tostring(err))
+    warn("[Autojoiner] Falló el teleport: " .. tostring(err))
 end
