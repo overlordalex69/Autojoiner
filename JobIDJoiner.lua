@@ -1,69 +1,148 @@
---// JobID-Joiner-Roblox Auto Only Join - by overlordalex69, basado en awaitlol
---// Sin UI ni menus, solo teleport directo al JobId definido
+--// JobID-Joiner-Roblox by awaitlol. on Discord!
 
+--// Services
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
-local StarterGui = game:GetService("StarterGui")
 local LP = Players.LocalPlayer
 
--- Utilidad para notificación simple en pantalla
-local function notify(title, content, duration)
-    pcall(function()
-        StarterGui:SetCore("SendNotification", {
-            Title = title,
-            Text = tostring(content),
-            Duration = duration or 5
+--// Auto-fallback for GameID
+if not getgenv().GameID then
+    warn("[JobId Joiner] No GameID provided, defaulting to current PlaceId.")
+    getgenv().GameID = game.PlaceId
+end
+
+-- Check if current game matches chosen GameID
+if game.PlaceId ~= getgenv().GameID then
+    warn("[JobId Joiner] You are not in the target GameID right now.")
+end
+
+--// Load Rayfield
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "JobId Joiner",
+    LoadingTitle = "JobId Joiner",
+    LoadingSubtitle = "by awaitlol",
+    ConfigurationSaving = { Enabled = false },
+    Discord = { Enabled = false },
+    KeySystem = false
+})
+
+local MainTab = Window:CreateTab("Joiner", 4483362458)
+
+--// Notify Game Info
+task.spawn(function()
+    local success, result = pcall(function()
+        return game:HttpGet("https://games.roblox.com/v1/games?universeIds=" .. tostring(game.GameId))
+    end)
+
+    if success and result then
+        local data = HttpService:JSONDecode(result)
+        local gameName = data.data and data.data[1] and data.data[1].name or "Unknown"
+
+        Rayfield:Notify({
+            Title = "Game Detected!",
+            Content = "Game name: " .. tostring(gameName),
+            Duration = 6,
+            Image = 4483362458,
         })
-    end)
-end
-
--- 1. Validar JobID proporcionado por usuario
-if not getgenv().JobID or type(getgenv().JobID) ~= "string" or #getgenv().JobID < 5 then
-    warn("[JobId Joiner] No se proporcionó JobID válido en getgenv().JobID")
-    notify("JobID Joiner", "No se proporcionó JobID válido en getgenv().JobID", 8)
-    return
-end
-
--- 2. Tomar GameID automaticamente (experiencia actual)
-local GameID = game.PlaceId
-
--- 3. Si ya estás en ese JobID, no hacer nada
-if tostring(game.JobId) == tostring(getgenv().JobID) then
-    warn("[JobId Joiner] Ya estás en el JobID especificado.")
-    notify("JobID Joiner", "Ya estás en el JobID especificado.", 6)
-    return
-end
-
--- 4. Hacer solicitud HTTPS para verificar si el Job existe (opcional, pero recomendado)
-local function jobExists(gameId, jobId)
-    local url = ("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100"):format(gameId)
-    local success, response = pcall(function()
-        return game:HttpGet(url)
-    end)
-    if not success then return false end
-    local data
-    pcall(function() data = HttpService:JSONDecode(response) end)
-    if not data or not data.data then return false end
-    for _, server in ipairs(data.data) do
-        if server.id == jobId then
-            return true
-        end
+    else
+        Rayfield:Notify({
+            Title = "Game Detection Failed",
+            Content = "Could not fetch game name.",
+            Duration = 6,
+            Image = 4483362458,
+        })
     end
-    return false
+end)
+
+--// Helpers
+local function notify(title, content, duration)
+    Rayfield:Notify({
+        Title = title,
+        Content = content,
+        Duration = duration or 4,
+        Image = 4483362458,
+    })
 end
 
--- 5. Intentar teleport
-if jobExists(GameID, getgenv().JobID) then
-    notify("JobID Joiner", "Uniéndote al JobID...", 5)
+local function joinJob(jobId)
+    if type(jobId) ~= "string" or jobId == "" then
+        notify("Invalid JobId", "Please enter a valid JobId.")
+        return
+    end
+
+    notify("Teleporting…", "Attempting to join JobId", 5)
+
     local ok, err = pcall(function()
-        TeleportService:TeleportToPlaceInstance(GameID, getgenv().JobID, LP)
+        TeleportService:TeleportToPlaceInstance(getgenv().GameID, jobId, LP)
     end)
     if not ok then
-        warn("[JobId Joiner] Falló el teleport: " .. tostring(err))
-        notify("JobID Joiner", "Falló el teleport: " .. tostring(err), 8)
+        notify("Teleport failed", tostring(err))
     end
-else
-    warn("[JobId Joiner] El JobID no existe o no es público.")
-    notify("JobID Joiner", "El JobID no existe o no es público.", 8)
 end
+
+--// UI
+local currentInput = ""
+
+MainTab:CreateInput({
+    Name = "JobId",
+    PlaceholderText = "Paste JobId here",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(value)
+        currentInput = tostring(value or "")
+    end,
+})
+
+MainTab:CreateButton({
+    Name = "Join JobId",
+    Callback = function()
+        joinJob(currentInput)
+    end,
+})
+
+MainTab:CreateButton({
+    Name = "Rejoin This Server",
+    Callback = function()
+        if game.JobId and #game.JobId > 0 then
+            joinJob(game.JobId)
+        else
+            notify("No JobId", "This server has no JobId (studio/test?)")
+        end
+    end,
+})
+
+MainTab:CreateButton({
+    Name = "Copy Current JobId",
+    Callback = function()
+        local jid = tostring(game.JobId or "")
+        if jid == "" then
+            notify("No JobId", "Current session has no JobId to copy.")
+            return
+        end
+        if setclipboard then
+            setclipboard(jid)
+            notify("Copied", "JobId copied to clipboard.")
+        else
+            notify("Clipboard unavailable", "Your executor doesn't support setclipboard.")
+        end
+    end,
+})
+
+MainTab:CreateButton({
+    Name = "Copy Current GameId",
+    Callback = function()
+        local gid = tostring(game.PlaceId or "")
+        if gid == "" then
+            notify("No GameId", "Current session has no GameId to copy.")
+            return
+        end
+        if setclipboard then
+            setclipboard(gid)
+            notify("Copied", "GameId copied to clipboard.")
+        else
+            notify("Clipboard unavailable", "Your executor doesn't support setclipboard.")
+        end
+    end,
+})
